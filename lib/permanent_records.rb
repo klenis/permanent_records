@@ -25,7 +25,7 @@ module PermanentRecords
       end
     end
   end
-  
+
   module Scopes
     def deleted
       where("#{table_name}.deleted_at IS NOT NULL")
@@ -34,20 +34,20 @@ module PermanentRecords
       where("#{table_name}.deleted_at IS NULL")
     end
   end
-  
+
   module EarlyRails
     def with_deleted
       with_scope :find => {:conditions => "#{quoted_table_name}.deleted_at IS NOT NULL"} do
         yield
       end
     end
-    
+
     def with_not_deleted
       with_scope :find => {:conditions => "#{quoted_table_name}.deleted_at IS NULL"} do
         yield
       end
     end
-    
+
     # this next bit is basically stolen from the scope_out plugin
     [:deleted, :not_deleted].each do |name|
       define_method "find_#{name}" do |*args|
@@ -69,11 +69,11 @@ module PermanentRecords
   end
 
   module InstanceMethods
-    
+
     def is_permanent?
       respond_to?(:deleted_at)
     end
-    
+
     def deleted?
       deleted_at if is_permanent?
     end
@@ -101,7 +101,7 @@ module PermanentRecords
       end
       destroy_with_permanent_records force
     end
-    
+
     private
     def set_deleted_at(value)
       return self unless is_permanent?
@@ -113,7 +113,12 @@ module PermanentRecords
         # we call save! instead of update_attribute so an ActiveRecord::RecordInvalid
         # error will be raised if the record isn't valid. (This prevents reviving records that
         # disregard validation constraints,)
-        record.save!
+        # only run validations when trying to revive a record
+        if active_record_3?
+          value == nil ? record.save! : record.save!(:validate => false)
+        else
+          value == nil ? record.save! : record.save!(false)
+        end
         @attributes, @attributes_cache = record.attributes, record.attributes
       rescue Exception => e
         # trigger dependent record destruction (they were revived before this record,
@@ -175,7 +180,7 @@ module PermanentRecords
         send(name, :reload)
       end
     end
-    
+
     def attempt_notifying_observers(callback)
       begin
         notify_observers(callback)
@@ -183,11 +188,11 @@ module PermanentRecords
         # do nothing: this model isn't being observed
       end
     end
-    
+
     # return the records corresponding to an association with the `:dependent => :destroy` option
     def get_dependent_records
       dependent_records = {}
-      
+
       # check which dependent records are to be destroyed
       klass = self.class
       klass.reflections.each do |key, reflection|
@@ -205,7 +210,7 @@ module PermanentRecords
       end
       dependent_records
     end
-    
+
     # If we force the destruction of the record, we will need to force the destruction of dependent records if the
     # user specified `:dependent => :destroy` in the model.
     # By default, the call to super/destroy_with_permanent_records (i.e. the &block param) will only soft delete 
@@ -219,7 +224,7 @@ module PermanentRecords
       end
       result
     end
-    
+
     # permanently delete the records (i.e. remove from database)
     def permanently_delete_records(dependent_records)
       dependent_records.each do |klass, ids|
@@ -236,7 +241,7 @@ module PermanentRecords
         end
       end
     end
-    
+
     def active_record_3?
       ActiveRecord::VERSION::MAJOR >= 3
     end
@@ -244,4 +249,3 @@ module PermanentRecords
 end
 
 ActiveRecord::Base.send :include, PermanentRecords
-
