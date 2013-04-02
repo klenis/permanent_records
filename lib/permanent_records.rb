@@ -136,11 +136,11 @@ module PermanentRecords
       end
       if active_record_3?
         _run_destroy_callbacks do
-          deleted? || new_record? ? save : set_deleted_at(Time.now)
+          deleted? || new_record? ? save(:validate => false) : set_deleted_at(Time.now)
         end
       else
         run_callbacks :before_destroy
-        deleted? || new_record? ? save : set_deleted_at(Time.now)
+        deleted? || new_record? ? save(false) : set_deleted_at(Time.now)
         run_callbacks :after_destroy
       end
       self
